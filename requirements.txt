@@ -1,0 +1,11 @@
+# requirements.txt
+
+pytrends
+requests
+urllib3
+protobuf
+sentencepiece
+numpy
+pandas
+transformers
+torch
