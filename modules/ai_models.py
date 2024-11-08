@@ -1,37 +1,51 @@
-# File: modules/ai_models.py
-
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, GPTJForCausalLM
 import torch
+from bitsandbytes.optim import GlobalOptimManager
 
-def initialize_generator(model_path):
+def initialize_generator(model_path, quantize=False):
     """
     Initialize the language generation model and tokenizer from a local directory.
 
     Args:
         model_path (str): Path to the local model directory.
+        quantize (bool): Whether to enable quantization for the model.
 
     Returns:
-        dict: Dictionary containing the tokenizer, model, and device.
+        dict: Dictionary containing the tokenizer and model.
     """
     try:
         logging.info(f"Loading model and tokenizer from '{model_path}'.")
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
-            use_fast=False  # GPT-J-6B may not have a fast tokenizer
-        )
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,          # Use 16-bit precision if supported
-            low_cpu_mem_usage=True              # Reduce CPU memory usage
-        )
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+        # Conditional quantized model loading
+        if quantize:
+            logging.info("Using quantized model loading.")
+            model = GPTJForCausalLM.from_pretrained(
+                model_path,
+                load_in_8bit=True,  # Enable 8-bit precision
+                device_map="auto",  # Automatically map to available devices
+            )
+        else:
+            logging.info("Loading full-precision model.")
+            model = GPTJForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True
+            )
+        
+        # Move model to device
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
+
         logging.info("Generator model initialized successfully.")
         return {"tokenizer": tokenizer, "model": model, "device": device}
     except Exception as e:
         logging.error(f"Error initializing generator model: {e}")
         return None
+
 
 def generate_blog_content(generator, prompt, max_length=1024):
     """
@@ -51,7 +65,7 @@ def generate_blog_content(generator, prompt, max_length=1024):
         device = generator["device"]
 
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
-        max_model_length = model.config.max_position_embeddings
+        max_model_length = model.config.n_positions
         adjusted_max_length = min(max_length, max_model_length)
 
         outputs = model.generate(
@@ -62,8 +76,7 @@ def generate_blog_content(generator, prompt, max_length=1024):
             top_p=0.9,
             num_return_sequences=1,
             no_repeat_ngram_size=3,
-            pad_token_id=tokenizer.eos_token_id,
-            eos_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.eos_token_id
         )
         content = tokenizer.decode(outputs[0], skip_special_tokens=True)
         return content

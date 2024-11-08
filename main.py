@@ -1,10 +1,7 @@
-# File: main.py
-
 import logging
 import traceback
 import os
 
-# Import functions from modules
 from modules.fetch_trends import fetch_basic_trends, fetch_related_queries, fetch_top_trending_topics
 from modules.process_data import process_trend_data, generate_blog_prompts
 from modules.ai_models import initialize_generator, generate_blog_content
@@ -13,7 +10,7 @@ from modules.utils import save_data
 def main():
     # Setup logging
     logging.basicConfig(
-        level=logging.INFO,    # Change to logging.DEBUG for more detailed logs
+        level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
@@ -99,9 +96,11 @@ def main():
         return
 
     # Initialize language generation model
-    model_path = r"F:\models\gpt-j-6b\models--EleutherAI--gpt-j-6B\snapshots\47e169305d2e8376be1d31e765533382721b2cc1"  # Updated to use GPT-J-6B model
+    model_path = r"F:\models\gpt-j-6b\models--EleutherAI--gpt-j-6B\snapshots\47e169305d2e8376be1d31e765533382721b2cc1"
+    quantize_model = True  # Enable quantization
+
     try:
-        generator = initialize_generator(model_path)
+        generator = initialize_generator(model_path, quantize=quantize_model)
         if generator is None:
             logging.error("Generator model initialization failed. Exiting.")
             return
@@ -130,6 +129,7 @@ def main():
         except Exception as e:
             logging.error(f"Error generating blog {i}: {e}")
             traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
