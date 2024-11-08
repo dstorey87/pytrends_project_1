@@ -99,7 +99,7 @@ def main():
         return
 
     # Initialize language generation model
-    model_path = r"gpt2-medium"  # Or your local model directory
+    model_path = r"F:\models\gpt-j-6b\models--EleutherAI--gpt-j-6B\snapshots\47e169305d2e8376be1d31e765533382721b2cc1"  # Updated to use GPT-J-6B model
     try:
         generator = initialize_generator(model_path)
         if generator is None:
