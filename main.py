@@ -1,23 +1,10 @@
+from workers.worker import generate_blog_task
 import logging
 import traceback
 import os
-import requests
-
-# Import functions from modules
 from modules.fetch_trends import fetch_basic_trends, fetch_related_queries, fetch_top_trending_topics, fetch_news_headlines
-from modules.process_data import process_trend_data, generate_blog_prompts
+from modules.data_processing import process_trend_data, generate_blog_prompts
 from modules.utils import save_data
-
-
-def generate_blog_content(prompt):
-    """Generate blog content using the running model server."""
-    try:
-        response = requests.post("http://127.0.0.1:5000/generate", json={"prompt": prompt, "max_length": 1500})
-        response.raise_for_status()
-        return response.json().get("text", "")
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error communicating with the model server: {e}")
-        return None
 
 
 def main():
@@ -114,31 +101,19 @@ def main():
         if not blog_prompts:
             logging.error("No blog prompts generated. Exiting.")
             return
-        logging.info("Generated blog prompts successfully.")
+        logging.info(f"Generated {len(blog_prompts)} blog prompts.")
     except Exception as e:
         logging.error(f"Error generating blog prompts: {e}")
         traceback.print_exc()
         return
 
-    # Generate blogs
-    for i, prompt in enumerate(blog_prompts[:3], 1):  # Generate 3 blogs
+    # Queue blogs for generation
+    for i, prompt in enumerate(blog_prompts, 1):
         try:
-            logging.info(f"Generating blog {i} with prompt: {prompt}")
-            blog_content = generate_blog_content(prompt)
-            if not blog_content:
-                logging.error(f"Failed to generate content for blog {i}.")
-                continue
-            blog_path = os.path.join(output_dir, f"blog_{i}.txt")
-            with open(blog_path, 'w', encoding='utf-8') as f:
-                f.write(blog_content)
-            logging.info(f"Saved blog {i} to {blog_path}")
-
-            # Print blog content to console
-            print(f"\n--- Blog {i} ---\n")
-            print(blog_content)
-            print("\n--- End of Blog ---\n")
+            task = generate_blog_task.delay(prompt)
+            logging.info(f"Queued blog {i} for generation. Task ID: {task.id}")
         except Exception as e:
-            logging.error(f"Error generating blog {i}: {e}")
+            logging.error(f"Error queuing blog {i}: {e}")
             traceback.print_exc()
 
 
