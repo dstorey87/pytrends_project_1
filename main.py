@@ -1,14 +1,24 @@
-# File: main.py
-
 import logging
 import traceback
 import os
+import requests
 
 # Import functions from modules
 from modules.fetch_trends import fetch_basic_trends, fetch_related_queries, fetch_top_trending_topics
 from modules.process_data import process_trend_data, generate_blog_prompts
-from modules.ai_models import initialize_generator, generate_blog_content
 from modules.utils import save_data
+
+
+def generate_blog_content(prompt):
+    """Generate blog content using the running model server."""
+    try:
+        response = requests.post("http://127.0.0.1:5000/generate", json={"prompt": prompt})
+        response.raise_for_status()
+        return response.json().get("text", "")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error communicating with the model server: {e}")
+        return None
+
 
 def main():
     # Setup logging
@@ -98,25 +108,12 @@ def main():
         traceback.print_exc()
         return
 
-    # Initialize language generation model
-    model_path = r"F:\models\gpt-j-6b\models--EleutherAI--gpt-j-6B\snapshots\47e169305d2e8376be1d31e765533382721b2cc1"
-    offload_folder = "F:/models/offload"
-    try:
-        generator = initialize_generator(model_path, offload_folder=offload_folder)
-        if generator is None:
-            logging.error("Generator model initialization failed. Exiting.")
-            return
-    except Exception as e:
-        logging.error(f"Error initializing generator model: {e}")
-        traceback.print_exc()
-        return
-
     # Generate blogs
     for i, prompt in enumerate(blog_prompts, 1):
         try:
             logging.info(f"Generating blog {i} with prompt: {prompt}")
-            blog_content = generate_blog_content(generator, prompt)
-            if blog_content is None:
+            blog_content = generate_blog_content(prompt)
+            if not blog_content:
                 logging.error(f"Failed to generate content for blog {i}.")
                 continue
             blog_path = os.path.join(output_dir, f"blog_{i}.txt")
@@ -131,6 +128,7 @@ def main():
         except Exception as e:
             logging.error(f"Error generating blog {i}: {e}")
             traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
