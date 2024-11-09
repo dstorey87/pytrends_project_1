@@ -1,13 +1,13 @@
-# File: modules/fetch_trends.py
-
 import logging
 from pytrends.request import TrendReq
 import urllib3
 import traceback
 import pandas as pd
+import requests
 
 # Suppress SSL warnings (if necessary)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def fetch_basic_trends(keywords, timeframe):
     """
@@ -35,6 +35,7 @@ def fetch_basic_trends(keywords, timeframe):
     except Exception as e:
         logging.error(f"Error fetching basic trends data: {e}")
         return []
+
 
 def fetch_related_queries(keyword):
     """
@@ -76,6 +77,7 @@ def fetch_related_queries(keyword):
         logging.error(f"Error fetching related queries for {keyword}: {e}")
         return []
 
+
 def fetch_top_trending_topics():
     """
     Fetch top trending topics from Google Trends.
@@ -95,3 +97,36 @@ def fetch_top_trending_topics():
     except Exception as e:
         logging.error(f"Error fetching top trending topics: {e}")
         return []
+
+
+def fetch_news_headlines(keywords):
+    """
+    Fetch relevant news headlines for the provided keywords.
+
+    Args:
+        keywords (list): List of keywords to search for in news headlines.
+
+    Returns:
+        dict: Dictionary with keywords as keys and list of news articles as values.
+    """
+    news_api_key = "d011540efb1045df99ae2f66fc650ce0"
+    base_url = "https://newsapi.org/v2/everything"
+    news_data = {}
+
+    for keyword in keywords:
+        try:
+            logging.info(f"Fetching news headlines for keyword: {keyword}")
+            params = {
+                "q": keyword,
+                "language": "en",
+                "sortBy": "relevance",
+                "apiKey": news_api_key
+            }
+            response = requests.get(base_url, params=params)
+            response.raise_for_status()
+            articles = response.json().get("articles", [])
+            news_data[keyword] = [{"title": article["title"], "url": article["url"]} for article in articles]
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching news headlines for {keyword}: {e}")
+            news_data[keyword] = []
+    return news_data

@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import logging
 import os
 
@@ -12,23 +11,28 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 # Model and tokenizer initialization
 MODEL_PATH = r"F:\models\gpt-j-6b\models--EleutherAI--gpt-j-6B\snapshots\47e169305d2e8376be1d31e765533382721b2cc1"
-OFFLOAD_FOLDER = r"F:\offload"  # Adjust this if using multiple SSDs later
 
 try:
     logging.info("Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, pad_token="[PAD]")
     logging.info("Tokenizer loaded successfully.")
     
-    logging.info("Loading model...")
+    logging.info("Configuring model with 8-bit quantization...")
+    quantization_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        llm_int8_enable_fp32_cpu_offload=True,  # Offloads large layers to CPU if needed
+    )
+    
+    logging.info("Loading model with updated quantization settings...")
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_PATH,
         device_map="auto",  # Automatically selects the best device (e.g., GPU, CPU)
-        offload_folder=OFFLOAD_FOLDER,  # Offloads layers to disk for better performance
-        torch_dtype=torch.float16,  # Use half-precision for faster inference on supported GPUs
+        quantization_config=quantization_config,  # Use BitsAndBytesConfig for 8-bit quantization
+        offload_folder="offload",  # Offloads layers to disk if necessary
         low_cpu_mem_usage=True  # Optimizes memory usage on initialization
     )
     model.config.pad_token_id = tokenizer.pad_token_id
-    logging.info("Model loaded successfully.")
+    logging.info("Model loaded successfully with updated quantization settings.")
 except Exception as e:
     logging.error(f"Error initializing model or tokenizer: {e}", exc_info=True)
     raise SystemExit("Failed to initialize the model and tokenizer. Exiting.")
@@ -46,9 +50,7 @@ def generate_text():
 
         prompt = data["prompt"]
         max_length = data.get("max_length", 100)  # Default max_length to 100 if not provided
-        temperature = data.get("temperature", 0.7)  # Default temperature to 0.7 if not provided
-        top_p = data.get("top_p", 0.9)  # Default top_p to 0.9 if not provided
-        logging.info(f"Generating text for prompt: '{prompt}' with max_length={max_length}, temperature={temperature}, top_p={top_p}")
+        logging.info(f"Generating text for prompt: '{prompt}' with max_length={max_length}")
 
         # Generate text
         inputs = tokenizer(prompt, return_tensors="pt", padding=True)
@@ -58,8 +60,8 @@ def generate_text():
             attention_mask=inputs["attention_mask"],
             max_length=max_length,
             do_sample=True,  # Enables sampling for variability
-            temperature=temperature,  # Controls randomness
-            top_p=top_p  # Nucleus sampling for better quality
+            temperature=0.7,  # Controls randomness; lower values make the text more deterministic
+            top_p=0.9  # Nucleus sampling for better quality
         )
         generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
         logging.info(f"Generated text: {generated_text}")
