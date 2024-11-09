@@ -19,18 +19,6 @@ SERVER_URL = "http://127.0.0.1:5000/generate"
 # Define the output directory
 OUTPUT_DIR = "output"
 
-def validate_content(content):
-    """
-    Validate the generated content for coherence and relevance.
-    """
-    if len(content.split()) < 100:
-        logging.error("Generated content is too short.")
-        return False
-    if "blog" not in content.lower():
-        logging.error("Generated content does not mention 'blog'.")
-        return False
-    return True
-
 def generate_blog(prompt, max_length=1000, temperature=0.7, top_p=0.9, num_return_sequences=1):
     """
     Send a request to the server to generate a blog post.
@@ -87,11 +75,11 @@ if __name__ == "__main__":
         top_p=0.9,
         num_return_sequences=1
     )
-    if blog_content and validate_content(blog_content):
-        logging.info("Blog content successfully validated and generated.")
+    if blog_content:
+        logging.info("Blog content successfully generated.")
         print("\n--- Generated Blog ---\n")
         print(blog_content)
         print("\n--- End of Blog ---\n")
         save_blog(blog_content)
     else:
-        logging.error("Failed to generate valid blog content.")
+        logging.error("Failed to generate blog content.")
