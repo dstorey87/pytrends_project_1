@@ -1,0 +1,26 @@
+services:
+  redis:
+    image: redis:7.0
+    container_name: redis_worker
+    ports:
+      - "6380:6379"  # Expose Redis on host port 6380
+    volumes:
+      - redis_data:/data
+
+  pytrends_worker:
+    build:
+      context: .
+    container_name: pytrends_worker
+    depends_on:
+      - redis
+    command: celery -A workers.worker_tasks worker --loglevel=info
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=redis://redis_worker:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis_worker:6379/0
+      - DOCKER_ENV=yes  # Flag for environment detection
+    volumes:
+      - .:/app
+
+volumes:
+  redis_data:

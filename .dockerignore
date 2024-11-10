@@ -1,0 +1,30 @@
+# Ignore virtual environments
+venv/
+.venv/
+
+# Ignore Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ignore unnecessary files and directories
+.git/
+.gitignore
+output/
+modules/
+offload/
+utils/
+
+# Ignore any specific test scripts or temporary files
+*.log
+*.md
+*.ps1
+test*
+debug.log
+
+# Ignore specific file types that aren’t needed in the Docker context
+*.png
+*.jpg
+*.jpeg
+*.zip

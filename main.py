@@ -1,24 +1,36 @@
 import logging
 import traceback
 import os
-import requests
+from celery.result import AsyncResult
 
-# Import functions from modules
+# Import Celery configuration and task
+from celery_config import app
+from worker_tasks import generate_blog_task
+
+# Import the modules for data fetching and processing
 from modules.fetch_trends import fetch_basic_trends, fetch_related_queries, fetch_top_trending_topics, fetch_news_headlines
 from modules.process_data import process_trend_data, generate_blog_prompts
 from modules.utils import save_data
 
-
-def generate_blog_content(prompt):
-    """Generate blog content using the running model server."""
+def queue_blog_task(prompt):
+    """Queue blog generation task using Celery."""
     try:
-        response = requests.post("http://127.0.0.1:5000/generate", json={"prompt": prompt, "max_length": 1500})
-        response.raise_for_status()
-        return response.json().get("text", "")
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error communicating with the model server: {e}")
+        result = generate_blog_task.delay(prompt)
+        logging.info(f"Queued blog generation task. Task ID: {result.id}")
+        return result
+    except Exception as e:
+        logging.error(f"Error queuing blog task: {e}")
         return None
 
+def fetch_task_result(task_id):
+    """Fetch the result of a queued task."""
+    result = AsyncResult(task_id)
+    if result.ready():
+        if result.successful():
+            return result.result
+        else:
+            logging.error(f"Task {task_id} failed: {result.result}")
+    return None
 
 def main():
     # Setup logging
@@ -43,7 +55,7 @@ def main():
 
     # Use top N trending topics as keywords
     keywords = trending_topics[:5]
-    timeframe = "now 7-d"  # Last 7 days
+    timeframe = "now 7-d"
 
     # Ensure output directory exists
     output_dir = "output"
@@ -85,7 +97,7 @@ def main():
         logging.error(f"Error fetching news headlines: {e}")
         traceback.print_exc()
 
-    # Save data for debugging if needed
+    # Save data
     try:
         save_data(os.path.join(output_dir, "basic_trends.json"), basic_trends)
         save_data(os.path.join(output_dir, "related_queries.json"), related_queries)
@@ -120,27 +132,29 @@ def main():
         traceback.print_exc()
         return
 
-    # Generate blogs
-    for i, prompt in enumerate(blog_prompts[:3], 1):  # Generate 3 blogs
+    # Queue blog generation tasks
+    for i, prompt in enumerate(blog_prompts[:3], 1):
         try:
-            logging.info(f"Generating blog {i} with prompt: {prompt}")
-            blog_content = generate_blog_content(prompt)
-            if not blog_content:
-                logging.error(f"Failed to generate content for blog {i}.")
+            logging.info(f"Queuing blog {i} with prompt: {prompt}")
+            task_result = queue_blog_task(prompt)
+            if not task_result:
+                logging.error(f"Failed to queue task for blog {i}.")
                 continue
-            blog_path = os.path.join(output_dir, f"blog_{i}.txt")
-            with open(blog_path, 'w', encoding='utf-8') as f:
-                f.write(blog_content)
-            logging.info(f"Saved blog {i} to {blog_path}")
 
-            # Print blog content to console
-            print(f"\n--- Blog {i} ---\n")
-            print(blog_content)
-            print("\n--- End of Blog ---\n")
+            blog_content = fetch_task_result(task_result.id)
+            if blog_content:
+                blog_path = os.path.join(output_dir, f"blog_{i}.txt")
+                with open(blog_path, 'w', encoding='utf-8') as f:
+                    f.write(blog_content)
+                logging.info(f"Saved blog {i} to {blog_path}")
+
+                # Print blog content
+                print(f"\n--- Blog {i} ---\n{blog_content}\n--- End of Blog ---\n")
+            else:
+                logging.warning(f"Task {task_result.id} is still processing or failed.")
         except Exception as e:
-            logging.error(f"Error generating blog {i}: {e}")
+            logging.error(f"Error queuing or processing blog {i}: {e}")
             traceback.print_exc()
-
 
 if __name__ == "__main__":
     main()
