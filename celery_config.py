@@ -1,13 +1,12 @@
-from celery import Celery
+broker_url = 'redis://redis:6379/0'
+result_backend = 'redis://redis:6379/0'
 
-# Celery configuration
-app = Celery(
-    "workers",
-    broker="redis://redis:6379/0",  # Redis container in Docker Compose
-    backend="redis://redis:6379/0"  # Result backend
-)
+task_serializer = 'json'
+result_serializer = 'json'
+accept_content = ['json']
 
-# Define specific task routing
-app.conf.task_routes = {
-    "worker_tasks.generate_blog_task": {"queue": "blog"},
-}
+timezone = 'UTC'
+enable_utc = True
+broker_connection_retry_on_startup = True
+worker_prefetch_multiplier = 1
+task_acks_late = True

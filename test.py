@@ -1,15 +1,11 @@
-import requests
+from worker_tasks import generate_blog_task
 
-def test_model_server():
-    url = "http://127.0.0.1:5000/generate"
-    prompt = {"prompt": "What is the impact of AI on society?"}
-    
-    try:
-        response = requests.post(url, json=prompt)
-        response.raise_for_status()
-        print("Server response:", response.json())
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
+# Trigger the task
+result = generate_blog_task.delay("Write a detailed blog about AI's impact on society.")
 
-if __name__ == "__main__":
-    test_model_server()
+# Print task details
+print("Task status:", result.status)
+try:
+    print("Task result:", result.get(timeout=30))  # Wait for 30 seconds for the result
+except Exception as e:
+    print("Error:", str(e))

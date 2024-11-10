@@ -3,34 +3,39 @@ services:
     image: redis:7.0
     container_name: redis_worker
     ports:
-      - "6379:6379"  # Expose Redis for inter-service communication
+      - "6379:6379"
     volumes:
-      - redis_data:/data  # Persistent storage for Redis
+      - redis_data:/data
 
   celery_worker:
-    image: huggingface/transformers-pytorch-gpu:latest  # Use the locally built image
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: celery_worker
     depends_on:
       - redis
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - broker_connection_retry_on_startup=True
     volumes:
-      - ./worker_cache:/root/.cache/huggingface  # Persistent cache for Hugging Face libraries
-      - ./pip_cache:/root/.cache/pip            # Persistent pip cache
+      - ./worker_tasks.py:/app/worker_tasks.py
+      - ./celery_config.py:/app/celery_config.py
     command: celery -A worker_tasks worker --loglevel=info
 
   model_server:
-    image: huggingface/transformers-pytorch-gpu:latest  # Use the locally built image
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: model_server
     depends_on:
       - redis
     environment:
-      - TRANSFORMERS_CACHE=/models  # Specify model cache path inside container
+      - TRANSFORMERS_CACHE=/models
     volumes:
-      - ./models:/models  # Mount local models directory to the container
+      - ./models:/models
     ports:
-      - "8501:8501"  # Expose model server for API requests
+      - "5000:5000"
 
 volumes:
   redis_data:

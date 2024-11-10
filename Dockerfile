@@ -1,20 +1,15 @@
-# Use Python 3.10 slim image
 FROM python:3.10-slim
 
-# Set working directory in container
 WORKDIR /app
 
-# Install dependencies only once
-COPY requirements_worker.txt /app/
+COPY requirements_worker.txt .
 RUN pip install --no-cache-dir -r requirements_worker.txt
 
-# Mount persistent storage for caches
-VOLUME /root/.cache/huggingface  # For Hugging Face transformers
-VOLUME /root/.cache/pip          # For pip cache
+COPY worker_tasks.py .
+COPY celery_config.py .
 
-# Copy the worker-related files
-COPY worker_tasks.py /app/
-COPY celery_config.py /app/
+# Create a non-root user and switch to it
+RUN useradd -ms /bin/bash celery_user
+USER celery_user
 
-# Default command for the worker
 CMD ["celery", "-A", "worker_tasks", "worker", "--loglevel=info"]
