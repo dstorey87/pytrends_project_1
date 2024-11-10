@@ -1,17 +1,20 @@
-# Use Python slim image
+# Use Python 3.10 slim image
 FROM python:3.10-slim
 
-# Set the working directory in the container
+# Set working directory in container
 WORKDIR /app
 
-# Copy only the requirements file first to leverage Docker layer caching
-COPY requirements_worker.txt .
-
-# Install dependencies
+# Install dependencies only once
+COPY requirements_worker.txt /app/
 RUN pip install --no-cache-dir -r requirements_worker.txt
 
-# Now copy the rest of the application files
-COPY . /app
+# Mount persistent storage for caches
+VOLUME /root/.cache/huggingface  # For Hugging Face transformers
+VOLUME /root/.cache/pip          # For pip cache
 
-# Define the command to run the worker
+# Copy the worker-related files
+COPY worker_tasks.py /app/
+COPY celery_config.py /app/
+
+# Default command for the worker
 CMD ["celery", "-A", "worker_tasks", "worker", "--loglevel=info"]

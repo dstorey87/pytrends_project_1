@@ -3,24 +3,34 @@ services:
     image: redis:7.0
     container_name: redis_worker
     ports:
-      - "6380:6379"  # Expose Redis on host port 6380
+      - "6379:6379"  # Expose Redis for inter-service communication
     volumes:
-      - redis_data:/data
+      - redis_data:/data  # Persistent storage for Redis
 
-  pytrends_worker:
-    build:
-      context: .
-    container_name: pytrends_worker
+  celery_worker:
+    image: huggingface/transformers-pytorch-gpu:latest  # Use the locally built image
+    container_name: celery_worker
     depends_on:
       - redis
-    command: celery -A workers.worker_tasks worker --loglevel=info
     environment:
-      - PYTHONUNBUFFERED=1
-      - CELERY_BROKER_URL=redis://redis_worker:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis_worker:6379/0
-      - DOCKER_ENV=yes  # Flag for environment detection
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - .:/app
+      - ./worker_cache:/root/.cache/huggingface  # Persistent cache for Hugging Face libraries
+      - ./pip_cache:/root/.cache/pip            # Persistent pip cache
+    command: celery -A worker_tasks worker --loglevel=info
+
+  model_server:
+    image: huggingface/transformers-pytorch-gpu:latest  # Use the locally built image
+    container_name: model_server
+    depends_on:
+      - redis
+    environment:
+      - TRANSFORMERS_CACHE=/models  # Specify model cache path inside container
+    volumes:
+      - ./models:/models  # Mount local models directory to the container
+    ports:
+      - "8501:8501"  # Expose model server for API requests
 
 volumes:
   redis_data:

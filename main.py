@@ -2,12 +2,19 @@ import logging
 import traceback
 import os
 from celery.result import AsyncResult
+from celery import Celery
 
-# Import Celery configuration and task
-from celery_config import app
+# Configure Celery to connect to the Dockerized Redis and Celery worker
+app = Celery(
+    "worker_tasks",
+    broker="redis://localhost:6379/0",  # Docker-mapped Redis
+    backend="redis://localhost:6379/0",
+)
+
+# Import Celery tasks
 from worker_tasks import generate_blog_task
 
-# Import the modules for data fetching and processing
+# Import modules for data fetching and processing
 from modules.fetch_trends import fetch_basic_trends, fetch_related_queries, fetch_top_trending_topics, fetch_news_headlines
 from modules.process_data import process_trend_data, generate_blog_prompts
 from modules.utils import save_data
